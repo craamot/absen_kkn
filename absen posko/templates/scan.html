@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scan Absen — Posko KKN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+<style>
+  :root{
+    --paper:#FAF6EC;
+    --paper-2:#F2EDDD;
+    --ink:#1F3A34;
+    --ink-soft:#4A6459;
+    --line:#CDC5A8;
+    --stamp:#B33A2E;
+    --gold:#B0842A;
+    --good:#2E6B4F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(var(--paper) 0 31px, var(--line) 31px 32px),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    padding:0 0 60px;
+  }
+  .wrap{max-width:480px;margin:0 auto;padding:0 20px;}
+  header.cover{padding:32px 20px 18px;border-bottom:3px double var(--ink);position:relative;text-align:center;}
+  header.cover .stampmark{
+    position:absolute; top:16px; right:16px;width:48px;height:48px;border-radius:50%;
+    border:2px solid var(--stamp);color:var(--stamp);display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;letter-spacing:0.5px;
+    transform:rotate(-12deg);text-align:center;line-height:1.1;opacity:0.85;
+  }
+  h1{font-family:'Spectral',serif;font-weight:700;font-size:22px;margin:0 0 6px;letter-spacing:0.5px;}
+  header.cover p{margin:0;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:1.5px;}
+  .card{background:var(--paper-2);border:1px solid var(--line);border-radius:4px;padding:18px;margin:20px 0;}
+  .card h2{font-family:'Spectral',serif;font-size:16px;font-weight:600;margin:0 0 12px;color:var(--ink);text-align:center;}
+  label{display:block;font-size:12px;color:var(--ink-soft);margin:10px 0 4px;}
+  select{width:100%;padding:10px 10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;font-size:15px;}
+  button.btn{padding:11px 16px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font-family:'Inter',sans-serif;font-weight:500;font-size:14px;border-radius:3px;cursor:pointer;margin-top:12px;width:100%;}
+  button.btn:active{transform:scale(0.98);}
+  button.btn.ghost{background:transparent;color:var(--ink);}
+  video{width:100%;border-radius:4px;border:1px solid var(--line);background:#000;}
+  .scan-frame{position:relative;}
+  .scan-frame::after{content:'';position:absolute;inset:16%;border:2px solid var(--stamp);border-radius:8px;pointer-events:none;}
+  #scan-status{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-soft);text-align:center;margin:10px 0;min-height:32px;}
+  .hidden{display:none !important;}
+  input[type=file]{width:100%;font-size:13px;margin-top:4px;}
+  #stampOverlay{position:fixed;inset:0;z-index:999;display:none;align-items:center;justify-content:center;background:rgba(31,58,52,0.35);}
+  #stampOverlay .stamp-visual{width:180px;height:180px;border-radius:50%;border:5px solid var(--stamp);color:var(--stamp);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:700;text-align:center;background:var(--paper);transform:rotate(-14deg) scale(0.4);opacity:0;box-shadow:0 0 0 3px var(--paper), 0 0 0 5px var(--stamp);}
+  #stampOverlay.show .stamp-visual{animation:stampin 0.45s cubic-bezier(.2,1.6,.4,1) forwards;}
+  @keyframes stampin{0%{transform:rotate(-14deg) scale(2.2);opacity:0;}60%{transform:rotate(-14deg) scale(0.92);opacity:1;}100%{transform:rotate(-14deg) scale(1);opacity:1;}}
+  #stampOverlay .stamp-visual .big{font-size:20px;margin-bottom:4px;}
+  #stampOverlay .stamp-visual .small{font-size:10px;}
+  #stampOverlay .close-hint{position:absolute;bottom:60px;color:var(--paper);font-family:'Inter',sans-serif;font-size:13px;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="cover">
+    <div class="stampmark">POSKO<br>KKN</div>
+    <h1>Scan Absen</h1>
+    <p id="today-label">-</p>
+  </header>
+
+  <div class="card" id="photoCard">
+    <h2>Foto diri dulu, ya</h2>
+    <p style="text-align:center;font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Ini buat bukti kamu yang absen sendiri, bukan dititip.</p>
+    <div class="scan-frame">
+      <video id="selfieVideo" playsinline muted></video>
+    </div>
+    <canvas id="selfieCanvas" class="hidden"></canvas>
+    <img id="selfiePreview" class="hidden" style="width:100%;border-radius:4px;border:1px solid var(--line);">
+    <p id="selfie-status" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-soft);text-align:center;margin:10px 0;">Menyalakan kamera depan…</p>
+    <button class="btn" id="takeSelfieBtn">Ambil foto</button>
+    <button class="btn ghost hidden" id="retakeSelfieBtn">Ambil ulang</button>
+    <button class="btn hidden" id="confirmSelfieBtn">Lanjut ke scan QR</button>
+  </div>
+
+  <div class="card hidden" id="scanCard">
+    <h2>Arahkan kamera ke kode QR di posko</h2>
+    <div class="scan-frame">
+      <video id="video" playsinline muted></video>
+    </div>
+    <canvas id="canvas" class="hidden"></canvas>
+    <p id="scan-status">Menyalakan kamera…</p>
+    <button class="btn ghost" id="startCamBtn">Nyalakan kamera</button>
+    <label>Kamera tidak bisa dipakai? Unggah foto kode QR</label>
+    <input type="file" id="uploadQr" accept="image/*">
+  </div>
+
+  <div class="card hidden" id="pickNameCard">
+    <h2>Kamu siapa?</h2>
+    <select id="scanNameSelect"></select>
+    <button class="btn" id="confirmCheckinBtn">Absen sekarang</button>
+  </div>
+</div>
+
+<div id="stampOverlay">
+  <div class="stamp-visual" id="stampVisual">
+    <div class="big" id="stampBig">HADIR</div>
+    <div class="small" id="stampSmall">--:--</div>
+  </div>
+  <div class="close-hint">Ketuk di mana saja untuk lanjut</div>
+</div>
+
+<script>
+let stream = null;
+let selfieStream = null;
+let scanning = false;
+let pendingSession = null;
+let selfiePhoto = null;
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function fmtDate(s){
+  const [y,m,d] = s.split('-');
+  const bulan = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  return d+' '+bulan[parseInt(m,10)-1]+' '+y;
+}
+async function api(path, opts){
+  const res = await fetch('/api/'+path, Object.assign({headers:{'Content-Type':'application/json'}}, opts||{}));
+  return res.json();
+}
+
+document.getElementById('today-label').textContent = fmtDate(todayStr());
+
+async function startSelfieCamera() {
+  const video = document.getElementById("selfieVideo");
+  const statusEl = document.getElementById("selfie-status");
+
+  try {
+    selfieStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
+
+    video.srcObject = selfieStream;
+
+    await new Promise(resolve => {
+      video.onloadedmetadata = resolve;
+    });
+
+    await video.play();
+    statusEl.textContent = "Posisikan wajahmu, lalu tekan 'Ambil foto'.";
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "Kamera depan tidak bisa diakses.";
+  }
+}
+
+document.getElementById('takeSelfieBtn').onclick = ()=>{
+  const video = document.getElementById('selfieVideo');
+  const canvas = document.getElementById('selfieCanvas');
+  const preview = document.getElementById('selfiePreview');
+  const w = 240;
+  const h = Math.round(w * (video.videoHeight / video.videoWidth || 1.33));
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(w, 0); ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, w, h);
+  selfiePhoto = canvas.toDataURL('image/jpeg', 0.6);
+
+  preview.src = selfiePhoto;
+  preview.classList.remove('hidden');
+  video.classList.add('hidden');
+  stopSelfieCamera();
+
+  document.getElementById('selfie-status').textContent = 'Foto diambil. Lanjut kalau sudah jelas kelihatan wajahnya.';
+  document.getElementById('takeSelfieBtn').classList.add('hidden');
+  document.getElementById('retakeSelfieBtn').classList.remove('hidden');
+  document.getElementById('confirmSelfieBtn').classList.remove('hidden');
+};
+
+document.getElementById('retakeSelfieBtn').onclick = async ()=>{
+  selfiePhoto = null;
+  document.getElementById('selfiePreview').classList.add('hidden');
+  document.getElementById('selfieVideo').classList.remove('hidden');
+  document.getElementById('takeSelfieBtn').classList.remove('hidden');
+  document.getElementById('retakeSelfieBtn').classList.add('hidden');
+  document.getElementById('confirmSelfieBtn').classList.add('hidden');
+  await startSelfieCamera();
+};
+
+document.getElementById('confirmSelfieBtn').onclick = ()=>{
+  document.getElementById('photoCard').classList.add('hidden');
+  document.getElementById('scanCard').classList.remove('hidden');
+  startCamera();
+};
+
+function showStamp(status, time, already){
+  const overlay = document.getElementById('stampOverlay');
+  const big = document.getElementById('stampBig');
+  const small = document.getElementById('stampSmall');
+  const visual = document.getElementById('stampVisual');
+  visual.style.animation = 'none';
+  void visual.offsetWidth;
+  visual.style.animation = '';
+  const labels = { tepat:'HADIR', telat:'TERLAMBAT', manual:'HADIR (MANUAL)' };
+  big.textContent = already ? 'SUDAH ABSEN' : labels[status];
+  small.textContent = fmtDate(todayStr())+' · '+time;
+  overlay.style.display = 'flex';
+  requestAnimationFrame(()=> overlay.classList.add('show'));
+}
+document.getElementById('stampOverlay').addEventListener('click', ()=>{
+  const overlay = document.getElementById('stampOverlay');
+  overlay.classList.remove('show');
+  overlay.style.display = 'none';
+  document.getElementById('pickNameCard').classList.add('hidden');
+  document.getElementById('scan-status').textContent = 'Sudah selesai. Terima kasih!';
+});
+
+async function renderScanSelect(){
+  const members = await api('members');
+  const sel = document.getElementById('scanNameSelect');
+  sel.innerHTML = '';
+  const todays = await api('attendance?date='+todayStr());
+  const already = new Set(todays.map(l=>l.name));
+  members.filter(m=>!already.has(m)).forEach(m=>{
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    sel.appendChild(opt);
+  });
+  if(members.length === 0){
+    document.getElementById('scan-status').textContent = 'Belum ada anggota terdaftar. Minta admin menambahkan nama dulu.';
+  }
+}
+
+document.getElementById('confirmCheckinBtn').onclick = async ()=>{
+  const name = document.getElementById('scanNameSelect').value;
+  if(!name || !pendingSession) return;
+  const result = await api('checkin', {method:'POST', body: JSON.stringify({
+    name, token: pendingSession.token, session_date: pendingSession.date, photo: selfiePhoto
+  })});
+  if(result.error){
+    document.getElementById('scan-status').textContent = result.error;
+    return;
+  }
+  document.getElementById('pickNameCard').classList.add('hidden');
+  showStamp(result.status, result.time, result.already);
+};
+
+async function startCamera(){
+  const video = document.getElementById('video');
+  const statusEl = document.getElementById('scan-status');
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
+    video.srcObject = stream;
+    await video.play();
+    statusEl.textContent = 'Arahkan kamera ke kode QR di posko.';
+    document.getElementById('startCamBtn').classList.add('hidden');
+    scanning = true;
+    requestAnimationFrame(scanLoop);
+  }catch(e){
+    statusEl.textContent = 'Kamera tidak bisa diakses (butuh HTTPS di banyak HP). Unggah foto kode QR saja.';
+    document.getElementById('startCamBtn').classList.remove('hidden');
+  }
+}
+function stopCamera(){
+  scanning = false;
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+}
+document.getElementById('startCamBtn').onclick = startCamera;
+
+function scanLoop(){
+  if(!scanning) return;
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  if(video.readyState === video.HAVE_ENOUGH_DATA){
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imgData.data, imgData.width, imgData.height);
+    if(code){
+      handleScanResult(code.data);
+      return;
+    }
+  }
+  requestAnimationFrame(scanLoop);
+}
+
+async function handleScanResult(text){
+  let parsed;
+  try{ parsed = JSON.parse(text); }catch(e){ parsed = null; }
+  const statusEl = document.getElementById('scan-status');
+  if(!parsed || parsed.app !== 'kkn-absensi'){
+    statusEl.textContent = 'Kode QR tidak dikenali. Coba lagi.';
+    requestAnimationFrame(scanLoop);
+    return;
+  }
+  scanning = false;
+  stopCamera();
+  pendingSession = parsed;
+  statusEl.textContent = 'Kode QR terbaca. Pilih namamu.';
+  await renderScanSelect();
+  document.getElementById('pickNameCard').classList.remove('hidden');
+}
+
+document.getElementById('uploadQr').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const img = new Image();
+  img.onload = ()=>{
+    const canvas = document.getElementById('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imgData.data, imgData.width, imgData.height);
+    if(code){
+      handleScanResult(code.data);
+    }else{
+      document.getElementById('scan-status').textContent = 'Tidak ada kode QR terdeteksi pada foto itu.';
+    }
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+
+startSelfieCamera();
+
+
+</script>
+</body>
+</html>

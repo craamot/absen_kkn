@@ -1,0 +1,37 @@
+CREATE DATABASE IF NOT EXISTS absensi_kkn
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE absensi_kkn;
+
+CREATE TABLE IF NOT EXISTS members (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  id TINYINT PRIMARY KEY DEFAULT 1,
+  cutoff_time TIME NOT NULL DEFAULT '07:00:00'
+);
+
+INSERT INTO settings (id, cutoff_time)
+  VALUES (1, '07:00:00')
+  ON DUPLICATE KEY UPDATE id = id;
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  session_date DATE NOT NULL UNIQUE,
+  token VARCHAR(20) NOT NULL,
+  is_open BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS attendance (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  member_name VARCHAR(100) NOT NULL,
+  session_date DATE NOT NULL,
+  time_in TIME NOT NULL,
+  status ENUM('tepat', 'telat', 'manual') NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_member_day (member_name, session_date)
+);
